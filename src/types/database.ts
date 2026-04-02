@@ -16,14 +16,20 @@ export interface Item {
   warmth_score: number;
   elegance_score: number;
   description?: string;
+  color?: string;
+  pattern?: string;
+  style_tags: string[];
   last_used?: string;
   created_at: string;
-  wardrobe_ids: string[]; // Array of wardrobe IDs
+  wardrobe_ids: string[];
 }
 
 export interface Outfit {
   id: string;
   user_id: string;
-  items_included: string[]; // array of item_ids
+  item_ids: string[]; // UUID array
+  total_warmth: number;
+  avg_elegance: number;
+  style_coherence?: string;
   created_at: string;
 }
