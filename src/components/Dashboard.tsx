@@ -1,11 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { Item } from '../types/database';
-import { calculateTargetWarmth, generateOutfits, ActivityLevel } from '../lib/selectionLogic';
+import type { Item } from '../types/database';
+import { calculateTargetWarmth, generateOutfits } from '../lib/selectionLogic';
+import type { ActivityLevel } from '../lib/selectionLogic';
 import { Button } from './ui/Button';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/Card';
 import { Slider } from './ui/Slider';
-import { Cloud, Sun, Wind, Thermometer, Check } from 'lucide-react';
+import { Wind, Thermometer, Check } from 'lucide-react';
 
 export function Dashboard() {
   const [items, setItems] = useState<Item[]>([]);
@@ -30,19 +31,31 @@ export function Dashboard() {
 
   async function fetchWeather() {
     setLoading(true);
-    // In a real app, use an actual API key and fetch from OpenWeatherMap
-    // const res = await fetch(`https://api.openweathermap.org/data/2.5/weather?q=${city}&units=metric&appid=YOUR_API_KEY`);
-    // const data = await res.json();
-    
-    // Mocking weather for demo
-    setTimeout(() => {
+    try {
+      // 1. Geocoding: Get coordinates from city name
+      const geoRes = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${city}&count=1&language=en&format=json`);
+      const geoData = await geoRes.json();
+      
+      if (!geoData.results || geoData.results.length === 0) {
+        throw new Error('City not found');
+      }
+      
+      const { latitude, longitude, name } = geoData.results[0];
+
+      // 2. Fetch Weather using coordinates
+      const weatherRes = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,wind_speed_10m&timezone=auto`);
+      const weatherData = await weatherRes.json();
+      
       setWeather({
-        temp: Math.floor(Math.random() * 30),
-        wind: Math.floor(Math.random() * 20),
-        city: city
+        temp: Math.round(weatherData.current.temperature_2m),
+        wind: Math.round(weatherData.current.wind_speed_10m),
+        city: name
       });
+    } catch (error: any) {
+      alert(error.message);
+    } finally {
       setLoading(false);
-    }, 1000);
+    }
   }
 
   function handleGenerate() {

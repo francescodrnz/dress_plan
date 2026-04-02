@@ -1,4 +1,4 @@
-import { Item } from '../types/database';
+import type { Item } from '../types/database';
 
 export type ActivityLevel = 'stationary' | 'moving' | 'indoor';
 
