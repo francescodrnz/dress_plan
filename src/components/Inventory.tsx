@@ -10,6 +10,7 @@ import { Trash2, MapPin, PackagePlus } from 'lucide-react';
 export function Inventory() {
   const [items, setItems] = useState<Item[]>([]);
   const [wardrobes, setWardrobes] = useState<Wardrobe[]>([]);
+  const [activeWardrobeId, setActiveWardrobeId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [showBatchUpload, setShowBatchUpload] = useState(false);
   const [showWardrobeForm, setShowWardrobeForm] = useState(false);
@@ -30,11 +31,25 @@ export function Inventory() {
         supabase.from('wardrobes').select('*').eq('user_id', user.id).order('name')
       ]);
       
+      const fetchedWardrobes = wardrobesRes.data || [];
       setItems(itemsRes.data || []);
-      setWardrobes(wardrobesRes.data || []);
+      setWardrobes(fetchedWardrobes);
+
+      // Default to last used or first wardrobe
+      const lastId = localStorage.getItem('last_wardrobe_id');
+      if (lastId && fetchedWardrobes.some(w => w.id === lastId)) {
+        setActiveWardrobeId(lastId);
+      } else if (fetchedWardrobes.length > 0) {
+        setActiveWardrobeId(fetchedWardrobes[0].id);
+      }
     }
     setLoading(false);
   }
+
+  const handleWardrobeSelect = (id: string) => {
+    setActiveWardrobeId(id);
+    localStorage.setItem('last_wardrobe_id', id);
+  };
 
   async function handleAddWardrobe(e: React.FormEvent) {
     e.preventDefault();
@@ -63,17 +78,37 @@ export function Inventory() {
     else fetchData();
   }
 
+  const activeWardrobe = wardrobes.find(w => w.id === activeWardrobeId);
+
   return (
     <div className="p-4 space-y-6">
       <div className="flex justify-between items-center flex-wrap gap-2">
-        <h2 className="text-2xl font-bold">Manage</h2>
+        <h2 className="text-2xl font-bold">Wardrobe Management</h2>
         <div className="flex gap-2">
           <Button variant="outline" onClick={() => setShowWardrobeForm(!showWardrobeForm)}>
             <MapPin className="mr-2 h-4 w-4" /> New Wardrobe
           </Button>
-          <Button onClick={() => setShowBatchUpload(!showBatchUpload)}>
-            <PackagePlus className="mr-2 h-4 w-4" /> {showBatchUpload ? 'Close Batch' : 'Batch Upload'}
+          <Button onClick={() => setShowBatchUpload(!showBatchUpload)} disabled={!activeWardrobeId}>
+            <PackagePlus className="mr-2 h-4 w-4" /> {showBatchUpload ? 'Close Upload' : 'Batch Upload'}
           </Button>
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <label className="text-sm font-medium flex items-center gap-2 text-zinc-500 italic">
+          Select wardrobe to manage:
+        </label>
+        <div className="flex gap-2 overflow-x-auto pb-2">
+          {wardrobes.map(w => (
+            <Button 
+              key={w.id} 
+              variant={activeWardrobeId === w.id ? 'primary' : 'outline'}
+              size="sm"
+              onClick={() => handleWardrobeSelect(w.id)}
+            >
+              {w.name}
+            </Button>
+          ))}
         </div>
       </div>
 
@@ -92,31 +127,42 @@ export function Inventory() {
         </Card>
       )}
 
-      {showBatchUpload && (
+      {showBatchUpload && activeWardrobe && (
         <div className="relative">
-          <BatchUpload />
+          <div className="bg-zinc-100 dark:bg-zinc-900 p-3 rounded-t-lg border-x border-t border-zinc-200 dark:border-zinc-800 text-sm font-bold flex items-center gap-2">
+            <PackagePlus className="h-4 w-4" /> Uploading to: <span className="text-zinc-500 underline">{activeWardrobe.name}</span>
+          </div>
+          <BatchUpload activeWardrobeId={activeWardrobeId} />
           <div className="mt-4 flex justify-center">
-             <Button variant="ghost" size="sm" onClick={fetchData}>Refresh Wardrobe List</Button>
+             <Button variant="ghost" size="sm" onClick={fetchData}>Refresh List After Upload</Button>
           </div>
         </div>
       )}
 
-      {loading ? <p className="text-center">Loading closet...</p> : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
-          {items.map((item) => (
-            <div key={item.id} className="group relative aspect-[3/4] rounded-lg overflow-hidden bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800">
-              <img src={item.image_url} alt={item.description} className="h-full w-full object-cover transition-transform group-hover:scale-105" />
-              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center p-2">
-                <Button variant="danger" size="icon" className="rounded-full" onClick={() => deleteItem(item.id)}><Trash2 className="h-4 w-4" /></Button>
-              </div>
-              <div className="absolute bottom-0 left-0 right-0 bg-white/90 dark:bg-zinc-950/90 p-1 text-[8px] flex flex-col uppercase tracking-tighter">
-                <div className="flex justify-between"><span>{item.category}</span><span>W:{item.warmth_score} E:{item.elegance_score}</span></div>
-                <div className="text-zinc-500 truncate">{item.wardrobe_ids?.map(id => wardrobes.find(w => w.id === id)?.name).join(', ')}</div>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
+      <div className="border-t border-zinc-200 dark:border-zinc-800 pt-6">
+        <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+          {activeWardrobe ? `Items in ${activeWardrobe.name}` : 'All Items'}
+        </h3>
+        
+        {loading ? <p className="text-center">Loading closet...</p> : (
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+            {items
+              .filter(item => !activeWardrobeId || item.wardrobe_ids?.includes(activeWardrobeId))
+              .map((item) => (
+                <div key={item.id} className="group relative aspect-[3/4] rounded-lg overflow-hidden bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800">
+                  <img src={item.image_url} alt={item.description} className="h-full w-full object-cover transition-transform group-hover:scale-105" />
+                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center p-2">
+                    <Button variant="danger" size="icon" className="rounded-full" onClick={() => deleteItem(item.id)}><Trash2 className="h-4 w-4" /></Button>
+                  </div>
+                  <div className="absolute bottom-0 left-0 right-0 bg-white/90 dark:bg-zinc-950/90 p-1 text-[8px] flex flex-col uppercase tracking-tighter">
+                    <div className="flex justify-between"><span>{item.category}</span><span>W:{item.warmth_score} E:{item.elegance_score}</span></div>
+                    <div className="text-zinc-500 truncate">{item.wardrobe_ids?.map(id => wardrobes.find(w => w.id === id)?.name).join(', ')}</div>
+                  </div>
+                </div>
+              ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

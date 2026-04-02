@@ -9,7 +9,11 @@ interface BatchLog {
   message: string;
 }
 
-export function BatchUpload() {
+interface BatchUploadProps {
+  activeWardrobeId?: string | null;
+}
+
+export function BatchUpload({ activeWardrobeId }: BatchUploadProps) {
   const [files, setFiles] = useState<File[]>([]);
   const [jsonText, setJsonText] = useState('');
   const [uploading, setUploading] = useState(false);
@@ -59,6 +63,11 @@ export function BatchUpload() {
             .getPublicUrl(filePath);
 
           // 3. Insert DB
+          const wardrobeIds = item.wardrobe_ids || [];
+          if (activeWardrobeId && !wardrobeIds.includes(activeWardrobeId)) {
+            wardrobeIds.push(activeWardrobeId);
+          }
+
           const { error: dbError } = await supabase.from('items').insert({
             user_id: user.id,
             image_url: publicUrl,
@@ -69,7 +78,8 @@ export function BatchUpload() {
             color: item.color || '',
             pattern: item.pattern || '',
             style_tags: item.style_tags || [],
-            wardrobe_ids: item.wardrobe_ids || []
+            wardrobe_ids: wardrobeIds,
+            created_at: new Date().toISOString(),
           });
 
           if (dbError) throw dbError;
@@ -92,7 +102,7 @@ export function BatchUpload() {
     <div className="p-4 space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle>Batch Upload</CardTitle>
+          <CardTitle>Batch Upload {activeWardrobeId ? '(Target Wardrobe Active)' : ''}</CardTitle>
           <CardDescription>Trascina le immagini e incolla il JSON per il caricamento massivo.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
