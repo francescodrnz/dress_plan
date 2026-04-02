@@ -27,6 +27,7 @@ export interface Item {
 export interface Outfit {
   id: string;
   user_id: string;
+  wardrobe_id?: string;
   item_ids: string[]; // UUID array
   total_warmth: number;
   avg_elegance: number;

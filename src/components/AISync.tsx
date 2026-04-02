@@ -4,16 +4,28 @@ import { Button } from './ui/Button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from './ui/Card';
 import { Clipboard, RefreshCw } from 'lucide-react';
 
-export function AISync() {
+export function AISync({ activeWardrobeId }: { activeWardrobeId: string | null }) {
   const [loading, setLoading] = useState(false);
   const [importJson, setImportJson] = useState('');
 
   const exportWardrobe = async () => {
+    if (!activeWardrobeId) {
+      alert('Seleziona prima un armadio.');
+      return;
+    }
+    
     setLoading(true);
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
+    if (!user) {
+      setLoading(false);
+      return;
+    }
 
-    const { data: items } = await supabase.from('items').select('id, category, warmth_score, elegance_score, description, color, pattern, style_tags').eq('user_id', user.id);
+    const { data: items } = await supabase
+      .from('items')
+      .select('id, category, warmth_score, elegance_score, description, color, pattern, style_tags')
+      .eq('user_id', user.id)
+      .contains('wardrobe_ids', [activeWardrobeId]);
     
     const minimized = (items || []).map(i => ({
       id: i.id,
@@ -32,6 +44,11 @@ export function AISync() {
   };
 
   const importOutfits = async () => {
+    if (!activeWardrobeId) {
+      alert('Seleziona prima un armadio.');
+      return;
+    }
+
     setLoading(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -40,12 +57,13 @@ export function AISync() {
       const outfits = JSON.parse(importJson);
       if (!Array.isArray(outfits)) throw new Error('Invalid JSON format');
 
-      // 1. Delete old outfits
-      await supabase.from('outfits').delete().eq('user_id', user.id);
+      // 1. Delete old outfits for THIS wardrobe
+      await supabase.from('outfits').delete().eq('user_id', user.id).eq('wardrobe_id', activeWardrobeId);
 
       // 2. Prepare for bulk insert
       const toInsert = outfits.map(o => ({
         user_id: user.id,
+        wardrobe_id: activeWardrobeId,
         item_ids: o.item_ids,
         total_warmth: o.total_warmth,
         avg_elegance: o.avg_elegance,
@@ -72,7 +90,7 @@ export function AISync() {
           <CardDescription>Export items to an LLM and import generated outfits.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <Button onClick={exportWardrobe} className="w-full" variant="outline" disabled={loading}>
+          <Button onClick={exportWardrobe} className="w-full" variant="outline" disabled={loading || !activeWardrobeId}>
             <Clipboard className="mr-2 h-4 w-4" /> Export Wardrobe
           </Button>
           
@@ -86,7 +104,7 @@ export function AISync() {
             />
           </div>
 
-          <Button onClick={importOutfits} className="w-full" disabled={loading || !importJson}>
+          <Button onClick={importOutfits} className="w-full" disabled={loading || !importJson || !activeWardrobeId}>
             <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
             Import & Sync
           </Button>

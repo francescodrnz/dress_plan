@@ -55,7 +55,7 @@ function App() {
       <main className="flex-1 max-w-4xl mx-auto w-full pb-20">
         {view === 'dashboard' && <Dashboard />}
         {view === 'inventory' && <Inventory />}
-        {view === 'sync' && <AISync />}
+        {view === 'sync' && <AISync activeWardrobeId={localStorage.getItem('last_wardrobe_id')} />}
       </main>
       
       {/* Mobile Bottom Nav */}

@@ -90,12 +90,13 @@ export function Dashboard() {
   async function fetchRecommendedOutfits(targetW: number, targetE: number) {
     setLoading(true);
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
+    if (!user || !activeWardrobe) return;
 
     const { data } = await supabase
       .from('outfits')
       .select('*')
       .eq('user_id', user.id)
+      .eq('wardrobe_id', activeWardrobe)
       .gte('total_warmth', targetW - 15)
       .lte('total_warmth', targetW + 15)
       .gte('avg_elegance', targetE - 20)
